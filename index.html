@@ -14,25 +14,9 @@
 <canvas id="c"></canvas>
 
 <script>
-  const WORDS = [
-    "cloud", "server", "container", "kubernetes", "docker", "serverless", "lambda",
-    "bucket", "endpoint", "latency", "uptime", "bandwidth", "firewall", "router",
-    "switch", "dns", "dhcp", "api", "rest", "graphql", "microservice", "devops",
-    "pipeline", "deploy", "rollback", "cache", "database", "sql", "nosql", "replica",
-    "shard", "failover", "backup", "storage", "compute", "network", "subnet", "vpn",
-    "tls", "oauth", "token", "iam", "saas", "paas", "iaas", "hybrid", "multicloud",
-    "edge", "cdn", "balancer", "autoscaling", "terraform", "ansible", "observability",
-    "metrics", "logs", "tracing", "alert", "cluster", "node", "pod", "ingress",
-    "egress", "virtual", "private", "region", "availability", "resilience",
-    "throughput", "packet", "protocol", "http", "tcp", "udp", "ipv6", "gateway",
-    "proxy", "middleware", "repository", "commit", "branch", "merge", "linux",
-    "git", "python", "webhook", "queue", "stream", "sync", "scale", "virtualization",
-    "hypervisor", "datacenter", "orchestration", "encryption", "compliance", "data lake"
-  ];
-
-  // one long lowercase string of the words, read in order
-  const TEXT = (WORDS.join(" ") + " ").repeat(6);
-  const TL = TEXT.length;
+  // glyph pool: half-width katakana, digits, and IT-ish symbols
+  const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789{}<>/\\|#$%&*+=?";
+  const randGlyph = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
 
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
@@ -46,42 +30,36 @@
     canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // large, readable monospace text, packed tightly
-    fs = Math.max(16, Math.min(22, W / 60));
+    fs = Math.max(9, Math.min(11, W / 110));
     ctx.font = `500 ${fs}px "Courier New", ui-monospace, Menlo, Consolas, monospace`;
     ctx.textBaseline = "top";
     cw = ctx.measureText("m").width;
-    lh = fs * 1.2;
+    lh = fs * 1.05;
 
     const rowCount = Math.ceil(H / lh) + 1;
     rows = [];
     for (let r = 0; r < rowCount; r++) {
       rows.push({
         y: r * lh,
-        baseSpeed: 60 + Math.random() * 90,         // px per second
-        spawnChance: 0.03 + Math.random() * 0.05,   // chance per frame of a new stream
+        baseSpeed: 60 + Math.random() * 90,
+        spawnChance: 0.03 + Math.random() * 0.05,
         streams: []
       });
     }
   }
 
-  function canSpawn(row, len) {
-    // only start a new stream once every existing stream's tail is well on screen,
-    // so streams sit side by side instead of piling into each other
+  function canSpawn(row) {
     return row.streams.every(s => s.x - s.len * cw > 3 * cw);
   }
 
   function spawn(row) {
-    const len = 12 + Math.floor(Math.random() * 18);
-    // start on a word boundary so words appear whole
-    let idx = Math.floor(Math.random() * TL);
-    while (TEXT[idx] !== " " && idx < TL - 1) idx++;
-    idx++;
+    const len = 14 + Math.floor(Math.random() * 28);
+    const chars = Array.from({ length: len }, randGlyph);
     row.streams.push({
-      x: -len * cw,                                 // starts fully off the left edge
-      speed: row.baseSpeed * (0.9 + Math.random() * 0.2),  // similar speeds within a row
+      x: -len * cw,
+      speed: row.baseSpeed * (0.9 + Math.random() * 0.2),
       len,
-      idx
+      chars
     });
   }
 
@@ -95,16 +73,20 @@
     ctx.fillRect(0, 0, W, H);
 
     for (const row of rows) {
-      if (row.streams.length < 8 && Math.random() < row.spawnChance && canSpawn(row)) spawn(row);
+      if (row.streams.length < 14 && Math.random() < row.spawnChance * 2 && canSpawn(row)) spawn(row);
 
       for (const s of row.streams) {
         s.x += s.speed * dt;
 
+        // garble: swap a few glyphs every frame so the text never settles
+        for (let k = 0; k < 2; k++) {
+          if (Math.random() < 0.6) s.chars[(Math.random() * s.len) | 0] = randGlyph();
+        }
+
         for (let i = 0; i < s.len; i++) {
-          // i = 0 is the head (rightmost); text reads left to right in normal order
           const px = s.x - i * cw;
           if (px < -cw || px > W + cw) continue;
-          const ch = TEXT[(s.idx + (s.len - 1 - i)) % TL];
+          const ch = s.chars[s.len - 1 - i];
 
           if (i === 0) {
             ctx.shadowColor = "#fff";
@@ -112,7 +94,7 @@
             ctx.fillStyle = "#fff";
           } else {
             ctx.shadowBlur = 0;
-            const a = 0.4 + 0.6 * (1 - i / s.len);   // brighter near the head, dimmer toward the tail
+            const a = 0.3 + 0.7 * (1 - i / s.len);
             ctx.fillStyle = `rgba(255, 255, 255, ${a.toFixed(3)})`;
           }
           ctx.fillText(ch, px, row.y);
