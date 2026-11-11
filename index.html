@@ -1,43 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b0b0c">
-  <meta name="description" content="Something considered is on its way. Stay close.">
-  <title>Coming Soon — Partner Cloud</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>cloud &amp; it flow</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; position: fixed; inset: 0; }
+</style>
 </head>
 <body>
-  <main class="page">
-    <header class="topbar">
-      <span class="status"><span class="status-dot"></span> A new chapter is taking shape</span>
-    </header>
+<canvas id="c"></canvas>
 
-    <section class="hero" id="top" aria-labelledby="headline">
-      <div class="hero-copy">
-        <p class="eyebrow">Something good is coming</p>
-        <h1 id="headline">Made with<br><span>intention.</span></h1>
-        <p class="intro">A quieter kind of studio for the things that matter. We’re putting the finishing touches on something new.</p>
-        <a class="notify-link" href="mailto:hello@partnercloud.com.au?subject=Keep%20me%20in%20the%20loop">Keep me in the loop <span aria-hidden="true">↗</span></a>
-      </div>
+<script>
+  const WORDS = [
+    "cloud", "server", "container", "kubernetes", "docker", "serverless", "lambda",
+    "bucket", "endpoint", "latency", "uptime", "bandwidth", "firewall", "router",
+    "switch", "dns", "dhcp", "api", "rest", "graphql", "microservice", "devops",
+    "pipeline", "deploy", "rollback", "cache", "database", "sql", "nosql", "replica",
+    "shard", "failover", "backup", "storage", "compute", "network", "subnet", "vpn",
+    "tls", "oauth", "token", "iam", "saas", "paas", "iaas", "hybrid", "multicloud",
+    "edge", "cdn", "balancer", "autoscaling", "terraform", "ansible", "observability",
+    "metrics", "logs", "tracing", "alert", "cluster", "node", "pod", "ingress",
+    "egress", "virtual", "private", "region", "availability", "resilience",
+    "throughput", "packet", "protocol", "http", "tcp", "udp", "ipv6", "gateway",
+    "proxy", "middleware", "repository", "commit", "branch", "merge", "linux",
+    "git", "python", "webhook", "queue", "stream", "sync", "scale", "virtualization",
+    "hypervisor", "datacenter", "orchestration", "encryption", "compliance", "data lake"
+  ];
 
-      <div class="art" aria-hidden="true">
-        <div class="orbit orbit-one"></div>
-        <div class="orbit orbit-two"></div>
-        <div class="orbit orbit-three"></div>
-        <div class="orb"></div>
-        <div class="art-caption"><span>01 / 03</span><span>In progress</span></div>
-      </div>
-    </section>
+  // one long lowercase string of the words, read in order
+  const TEXT = (WORDS.join(" ") + " ").repeat(6);
+  const TL = TEXT.length;
 
-    <footer class="footer">
-      <span>Independent by nature.</span>
-      <span>© <span id="year">2026</span> Partner Cloud</span>
-      <a href="mailto:hello@partnercloud.com.au">Say hello <span aria-hidden="true">↗</span></a>
-    </footer>
-  </main>
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  let W, H, dpr, fs, cw, lh, rows = [];
+
+  function init() {
+    dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // large, readable monospace text, packed tightly
+    fs = Math.max(16, Math.min(22, W / 60));
+    ctx.font = `500 ${fs}px "Courier New", ui-monospace, Menlo, Consolas, monospace`;
+    ctx.textBaseline = "top";
+    cw = ctx.measureText("m").width;
+    lh = fs * 1.2;
+
+    const rowCount = Math.ceil(H / lh) + 1;
+    rows = [];
+    for (let r = 0; r < rowCount; r++) {
+      rows.push({
+        y: r * lh,
+        baseSpeed: 60 + Math.random() * 90,         // px per second
+        spawnChance: 0.03 + Math.random() * 0.05,   // chance per frame of a new stream
+        streams: []
+      });
+    }
+  }
+
+  function canSpawn(row, len) {
+    // only start a new stream once every existing stream's tail is well on screen,
+    // so streams sit side by side instead of piling into each other
+    return row.streams.every(s => s.x - s.len * cw > 3 * cw);
+  }
+
+  function spawn(row) {
+    const len = 12 + Math.floor(Math.random() * 18);
+    // start on a word boundary so words appear whole
+    let idx = Math.floor(Math.random() * TL);
+    while (TEXT[idx] !== " " && idx < TL - 1) idx++;
+    idx++;
+    row.streams.push({
+      x: -len * cw,                                 // starts fully off the left edge
+      speed: row.baseSpeed * (0.9 + Math.random() * 0.2),  // similar speeds within a row
+      len,
+      idx
+    });
+  }
+
+  let last = performance.now();
+  function frame(t) {
+    const dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+
+    for (const row of rows) {
+      if (row.streams.length < 8 && Math.random() < row.spawnChance && canSpawn(row)) spawn(row);
+
+      for (const s of row.streams) {
+        s.x += s.speed * dt;
+
+        for (let i = 0; i < s.len; i++) {
+          // i = 0 is the head (rightmost); text reads left to right in normal order
+          const px = s.x - i * cw;
+          if (px < -cw || px > W + cw) continue;
+          const ch = TEXT[(s.idx + (s.len - 1 - i)) % TL];
+
+          if (i === 0) {
+            ctx.shadowColor = "#fff";
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = "#fff";
+          } else {
+            ctx.shadowBlur = 0;
+            const a = 0.4 + 0.6 * (1 - i / s.len);   // brighter near the head, dimmer toward the tail
+            ctx.fillStyle = `rgba(255, 255, 255, ${a.toFixed(3)})`;
+          }
+          ctx.fillText(ch, px, row.y);
+        }
+      }
+      ctx.shadowBlur = 0;
+
+      row.streams = row.streams.filter(s => s.x - s.len * cw < W + cw);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(init, 150);
+  });
+
+  init();
+  requestAnimationFrame(frame);
+</script>
 </body>
 </html>
-
